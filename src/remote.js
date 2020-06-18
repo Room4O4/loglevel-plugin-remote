@@ -1,5 +1,5 @@
 const win = window;
-
+var iqueue = null;
 if (!win) {
   throw new Error('Plugin for browser usage only');
 }
@@ -173,7 +173,7 @@ let pluginFactory;
 function plain(log) {
   return `[${log.timestamp}] ${log.level.label.toUpperCase()}${
     log.logger ? ` (${log.logger})` : ''
-  }: ${log.message}${log.stacktrace ? `\n${log.stacktrace}` : ''}`;
+    }: ${log.message}${log.stacktrace ? `\n${log.stacktrace}` : ''}`;
 }
 
 function json(log) {
@@ -193,7 +193,7 @@ const defaults = {
   method: 'POST',
   headers: {},
   token: '',
-  onUnauthorized: () => {},
+  onUnauthorized: () => { },
   timeout: 0,
   interval: 1000,
   level: 'trace',
@@ -255,21 +255,21 @@ const remote = {
     let isSending = false;
     let isSuspended = false;
 
-    const queue = new Queue(config.capacity);
+    iqueue = new Queue(config.capacity);
 
     function send() {
       if (isSuspended || isSending || config.token === undefined) {
         return;
       }
 
-      if (!queue.sent()) {
-        if (!queue.length()) {
+      if (!iqueue.sent()) {
+        if (!iqueue.length()) {
           return;
         }
 
-        const logs = queue.send();
+        const logs = iqueue.send();
 
-        queue.content = isJSON ? `{"logs":[${logs.join(',')}]}` : logs.join('\n');
+        iqueue.content = isJSON ? `{"logs":[${logs.join(',')}]}` : logs.join('\n');
       }
 
       isSending = true;
@@ -295,7 +295,7 @@ const remote = {
         if (!successful) {
           // interval = config.backoff(interval || 1);
           interval = backoffFunc(interval || 1);
-          queue.fail();
+          iqueue.fail();
         }
 
         isSuspended = true;
@@ -325,7 +325,7 @@ const remote = {
         if (xhr.status === 200) {
           // eslint-disable-next-line prefer-destructuring
           interval = config.interval;
-          queue.confirm();
+          iqueue.confirm();
           suspend(true);
         } else {
           if (xhr.status === 401) {
@@ -337,7 +337,7 @@ const remote = {
         }
       };
 
-      xhr.send(queue.content);
+      xhr.send(iqueue.content);
     }
 
     originalFactory = logger.methodFactory;
@@ -396,7 +396,7 @@ const remote = {
             content += log;
           }
 
-          queue.push(content);
+          iqueue.push(content);
           send();
         }
 
@@ -429,6 +429,9 @@ const remote = {
     remote.setToken = setToken;
   },
   setToken,
+  getQueueContent() {
+    return iqueue.send();
+  }
 };
 
 export default remote;
